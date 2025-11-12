@@ -3,24 +3,51 @@ import 'package:flutter/foundation.dart';
 import '../models/entity_model.dart';
 import 'sql_parser_service.dart';
 import 'image_ocr_service.dart';
+import 'ai_vision_service.dart';
 
 /// Servicio para interpretar diferentes tipos de entrada
 class InputInterpreterService {
+  /// Normaliza un nombre eliminando tildes y caracteres especiales
+  String _normalizeIdentifier(String input) {
+    // Reemplazar tildes
+    const accents = {
+      'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+      'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+      'ñ': 'n', 'Ñ': 'N',
+      'ü': 'u', 'Ü': 'U',
+    };
+    var result = input;
+    accents.forEach((k, v) {
+      result = result.replaceAll(k, v);
+    });
+    // Eliminar cualquier caracter que no sea letra, número o guion bajo
+    result = result.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+    return result;
+  }
   final SqlParserService _sqlParser = SqlParserService();
   final ImageOcrService _imageOcr = ImageOcrService();
+  final AiVisionService _aiVision = AiVisionService();
 
-  /// Interpreta una imagen (diagrama de clases)
+  /// Interpreta una imagen (diagrama de clases) usando IA
   Future<List<EntityModel>> interpretImage(String imagePath) async {
     try {
-      // Usar OCR para extraer texto de la imagen
-      final extractedText = await _imageOcr.extractText(imagePath);
+      debugPrint('🖼️ Iniciando análisis de imagen con IA...');
+      debugPrint('📁 Ruta de imagen: $imagePath');
       
-      debugPrint('=== OCR TEXTO EXTRAÍDO ===');
+      // Usar IA para analizar el diagrama UML
+      final extractedText = await _aiVision.analyzeUmlDiagram(imagePath);
+      
+      debugPrint('=== TEXTO GENERADO POR IA ===');
       debugPrint(extractedText);
-      debugPrint('=== FIN TEXTO OCR (${extractedText.length} caracteres) ===');
+      debugPrint('=== FIN TEXTO IA (${extractedText.length} caracteres) ===');
       
-      // Intentar interpretar el texto extraído
-      final entities = await _parseExtractedText(extractedText);
+      if (extractedText.isEmpty) {
+        debugPrint('⚠️ La IA no devolvió ningún texto');
+        throw Exception('La IA no pudo extraer información del diagrama');
+      }
+      
+      // Interpretar el texto generado por la IA
+      final entities = await _parseNaturalLanguage(extractedText);
       
       debugPrint('=== ENTIDADES ENCONTRADAS: ${entities.length} ===');
       for (var entity in entities) {
@@ -30,10 +57,25 @@ class InputInterpreterService {
         }
       }
       
+      if (entities.isEmpty) {
+        debugPrint('⚠️ No se encontraron entidades en la respuesta de la IA');
+        debugPrint('Respuesta completa: $extractedText');
+      }
+      
       return entities;
-    } catch (e) {
-      debugPrint('Error interpretando imagen: $e');
-      return [];
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error interpretando imagen con IA: $e');
+      debugPrint('Stack trace: $stackTrace');
+      debugPrint('⚠️ Intentando con OCR tradicional como fallback...');
+      
+      // Fallback: intentar con OCR tradicional
+      try {
+        final extractedText = await _imageOcr.extractText(imagePath);
+        return await _parseExtractedText(extractedText);
+      } catch (e2) {
+        debugPrint('❌ Error en fallback OCR: $e2');
+        rethrow; // Re-lanzar el error original de la IA
+      }
     }
   }
 
@@ -315,7 +357,8 @@ class InputInterpreterService {
     
     final match = regex.firstMatch(line);
     if (match != null) {
-      final entityName = match.group(1)!;
+      final rawEntityName = match.group(1)!;
+      final entityName = _normalizeIdentifier(rawEntityName);
       final parentName = match.group(2); // puede ser null
       final attributesText = match.group(3)!;
       
@@ -344,7 +387,8 @@ class InputInterpreterService {
     final regex2 = RegExp(r'^([A-Z][a-zA-Z0-9_]*)\s*\(([^)]+)\)$');
     final match2 = regex2.firstMatch(line);
     if (match2 != null) {
-      final entityName = match2.group(1)!;
+      final rawEntityName = match2.group(1)!;
+      final entityName = _normalizeIdentifier(rawEntityName);
       final attributesText = match2.group(2)!;
       
       final attrNames = attributesText.split(',').map((e) => e.trim()).toList();
@@ -355,7 +399,7 @@ class InputInterpreterService {
       for (var attrName in attrNames) {
         if (attrName.isNotEmpty) {
           attributes.add(AttributeModel(
-            name: attrName,
+            name: _normalizeIdentifier(attrName),
             type: 'String',
             isNullable: false,
           ));
@@ -382,10 +426,11 @@ class InputInterpreterService {
       final attrMatch = RegExp(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s+tipo\s+([a-zA-Z_][a-zA-Z0-9_]*)', caseSensitive: false).firstMatch(part);
       
       if (attrMatch != null) {
-        final attrName = attrMatch.group(1)!;
+        final rawAttrName = attrMatch.group(1)!;
+        final attrName = _normalizeIdentifier(rawAttrName);
         final attrType = attrMatch.group(2)!;
         
-        debugPrint('      * $attrName: ${_normalizeType(attrType)}');
+        debugPrint('      * $attrName: [36m${_normalizeType(attrType)}[0m');
         
         attributes.add(AttributeModel(
           name: attrName,
@@ -397,7 +442,7 @@ class InputInterpreterService {
         final simpleName = part.replaceAll(RegExp(r'\s+tipo\s+'), ' ').trim().split(' ')[0];
         if (simpleName.isNotEmpty && !_isCommonType(simpleName)) {
           attributes.add(AttributeModel(
-            name: simpleName,
+            name: _normalizeIdentifier(simpleName),
             type: 'String',
             isNullable: false,
           ));

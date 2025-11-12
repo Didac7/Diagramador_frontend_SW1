@@ -23,18 +23,24 @@ class GeneratorController extends ChangeNotifier {
   /// Procesa una imagen (diagrama de clases o entidad)
   Future<void> processImage(String imagePath) async {
     try {
-      _setProcessing(true, 'Analizando imagen...');
+      _setProcessing(true, 'Analizando imagen con IA...');
       _updateProgress(0.2);
 
       final entities = await _interpreterService.interpretImage(imagePath);
       
       _updateProgress(0.5);
       _entities = entities;
-      _setProcessing(false, 'Imagen procesada: ${entities.length} entidades encontradas');
+      
+      if (entities.isEmpty) {
+        _setProcessing(false, 'No se encontraron entidades en la imagen. Verifica que sea un diagrama UML válido.');
+      } else {
+        _setProcessing(false, 'Imagen procesada: ${entities.length} entidades encontradas');
+      }
       
       notifyListeners();
     } catch (e) {
-      _setProcessing(false, 'Error al procesar imagen: $e');
+      debugPrint('Error completo: $e');
+      _setProcessing(false, 'Error al procesar imagen: ${e.toString()}');
     }
   }
 

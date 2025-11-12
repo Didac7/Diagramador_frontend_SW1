@@ -34,14 +34,10 @@ class EntityModel {
     };
   }
 
-  String get className => _capitalize(name);
+  // Usar el nombre tal cual fue capturado (preserva PascalCase como VentaProducto)
+  String get className => name;
   String get variableName => _uncapitalize(name);
   String get pluralName => '${name}s';
-
-  String _capitalize(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1);
-  }
 
   String _uncapitalize(String text) {
     if (text.isEmpty) return text;

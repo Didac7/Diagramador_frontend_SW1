@@ -350,7 +350,9 @@ class CodeGeneratorService {
     );
     final titleCamelCase = _toCamelCase(titleAttr.name);
     
-    buffer.writeln("                title: Text(item.$titleCamelCase?.toString() ?? 'Sin nombre'),");
+    // Si el atributo es nullable, usar ?.toString(), si no, usar .toString()
+    final nullAware = titleAttr.isNullable ? '?' : '';
+    buffer.writeln("                title: Text(item.$titleCamelCase$nullAware.toString() ?? 'Sin nombre'),");
     buffer.writeln("                trailing: Row(");
     buffer.writeln("                  mainAxisSize: MainAxisSize.min,");
     buffer.writeln("                  children: [");
@@ -376,9 +378,15 @@ class CodeGeneratorService {
     );
     final idCamelCase = _toCamelCase(idAttr.name);
     
-    buffer.writeln("                        if (item.$idCamelCase != null) {");
-    buffer.writeln("                          await controller.delete(item.$idCamelCase!);");
-    buffer.writeln("                        }");
+    // Si el ID es nullable, usar verificación con != null y !
+    // Si el ID es required (no nullable), llamar delete directamente
+    if (idAttr.isNullable) {
+      buffer.writeln("                        if (item.$idCamelCase != null) {");
+      buffer.writeln("                          await controller.delete(item.$idCamelCase!);");
+      buffer.writeln("                        }");
+    } else {
+      buffer.writeln("                        await controller.delete(item.$idCamelCase);");
+    }
     buffer.writeln("                      },");
     buffer.writeln("                    ),");
     buffer.writeln("                  ],");
@@ -443,7 +451,9 @@ class CodeGeneratorService {
     for (var attr in entity.attributes) {
       if (!attr.isPrimaryKey) {
         final camelCaseName = _toCamelCase(attr.name);
-        buffer.writeln("      _${camelCaseName}Controller.text = widget.item!.$camelCaseName?.toString() ?? '';");
+        // Si el atributo es nullable, usar ?.toString(), si no, usar .toString()
+        final nullAware = attr.isNullable ? '?' : '';
+        buffer.writeln("      _${camelCaseName}Controller.text = widget.item!.$camelCaseName$nullAware.toString() ?? '';");
       }
     }
     
@@ -550,7 +560,14 @@ class CodeGeneratorService {
     buffer.writeln("                    if (widget.item == null) {");
     buffer.writeln("                      success = await controller.create(item);");
     buffer.writeln("                    } else {");
-    buffer.writeln("                      success = await controller.update(widget.item!.$idCamelCase ?? 0, item);");
+    
+    // Si el ID es nullable, usar ?? 0, si no, usar directamente el valor
+    if (idAttr.isNullable) {
+      buffer.writeln("                      success = await controller.update(widget.item!.$idCamelCase ?? 0, item);");
+    } else {
+      buffer.writeln("                      success = await controller.update(widget.item!.$idCamelCase, item);");
+    }
+    
     buffer.writeln("                    }");
     buffer.writeln();
     buffer.writeln("                    if (success && mounted) {");

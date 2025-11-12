@@ -101,7 +101,7 @@ class _GeneratorViewState extends State<GeneratorView> {
             ElevatedButton.icon(
               onPressed: controller.isProcessing ? null : () => _pickImage(controller),
               icon: const Icon(Icons.image),
-              label: const Text('🖱️ Subir Imagen (Diagrama)'),
+              label: const Text('🤖 Subir Imagen (Diagrama UML con IA)'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.all(16),
               ),
@@ -112,7 +112,7 @@ class _GeneratorViewState extends State<GeneratorView> {
             ElevatedButton.icon(
               onPressed: controller.isProcessing ? null : () => _takePhoto(controller),
               icon: const Icon(Icons.camera_alt),
-              label: const Text('📷 Tomar Foto'),
+              label: const Text('📷 Tomar Foto (Analizar con IA)'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.all(16),
               ),
